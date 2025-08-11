@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { extractKeywordsSchema, type KeywordResult } from "@shared/schema";
 import * as cheerio from "cheerio";
-import natural from "natural";
+// Removed natural import - implementing custom NLP
 
 // Comprehensive keyword mappings for categorization
 const TECHNICAL_SKILLS = new Set([
@@ -79,16 +79,23 @@ function extractKeywords(text: string): string[] {
   });
   
   // Extract noun phrases (simple implementation)
-  const sentences = natural.SentenceTokenizer.tokenize(text);
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const nounPhrases: string[] = [];
   
-  sentences.forEach(sentence => {
-    const tokens = natural.WordTokenizer.tokenize(sentence.toLowerCase());
-    if (!tokens) return;
+  sentences.forEach((sentence: string) => {
+    const tokens = sentence.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(t => t.length > 0);
     
     // Look for multi-word technical terms
     for (let i = 0; i < tokens.length - 1; i++) {
       const phrase = `${tokens[i]} ${tokens[i + 1]}`;
+      if (TECHNICAL_SKILLS.has(phrase) || SOFT_SKILLS.has(phrase) || TOOLS_TECHNOLOGIES.has(phrase)) {
+        nounPhrases.push(phrase);
+      }
+    }
+    
+    // Look for three-word technical phrases
+    for (let i = 0; i < tokens.length - 2; i++) {
+      const phrase = `${tokens[i]} ${tokens[i + 1]} ${tokens[i + 2]}`;
       if (TECHNICAL_SKILLS.has(phrase) || SOFT_SKILLS.has(phrase) || TOOLS_TECHNOLOGIES.has(phrase)) {
         nounPhrases.push(phrase);
       }
@@ -105,7 +112,7 @@ function extractKeywords(text: string): string[] {
     
     // Boost score for recognized skills/tools
     if (TECHNICAL_SKILLS.has(keyword) || SOFT_SKILLS.has(keyword) || TOOLS_TECHNOLOGIES.has(keyword)) {
-      score *= 3;
+      score *= 5; // Higher boost for known terms
     }
     
     keywordScores.set(keyword, score);
